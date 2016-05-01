@@ -6,3 +6,5 @@ For this assignment I created a data product using shiny. The was provided from 
 This will help users measure their nutritional intake and give them a good estimate on how much exercise is required to burn off a meal.
 
 Please find the Shiny application in the following link: 
+
+https://longchop.shinyapps.io/Data-Products/
