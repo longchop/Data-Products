@@ -1,16 +1,11 @@
 #Load required libraries
 library(shiny);library(dplyr); library(pipeR); library(readr); library(tidyr); library(ggplot2); library(lubridate); library(shinythemes)
 
-read_csv('./Data/FastFood.csv') %>>% 
-    mutate(Amount = ifelse(Amount == '?', NA, Amount) %>% as.numeric, Company = Company %>% as.factor, 
-           Item = Item %>% as.factor, `Nutritional Category` = `Nutritional Category`  %>% as.factor,
-           `Item Type` = `Item Type` %>% as.factor) %>>%
-    spread(`Nutritional Category`, Amount) %>>% {. -> tblFastFood} %>>% {names(.) %>% make.names -> names(tblFastFood)} 
 
-
-# Define server logic required to draw a histogram
+# Shiny Application
 shinyServer(function(input, output, session) {
-    observe({
+    
+    observe({ #Enable the dropdown list to filter (for item type) on the selected Fast food franchise
         company.itemtype <- switch(input$company, 
                                    `Arbys` = tblFastFood %>>% filter(Company == 'Arbys') %>>% (Item.Type) %>>% unique %>>% sort %>>% as.character,
                                    `Baskin Robbins` = tblFastFood %>>% filter(Company == 'Baskin Robbins') %>>% (Item.Type) %>>% unique %>>% sort %>>% as.character,
@@ -29,7 +24,7 @@ shinyServer(function(input, output, session) {
                                    `Wendys` = tblFastFood %>>% filter(Company == 'Wendys') %>>% (Item.Type) %>>% unique %>>% sort %>>% as.character)
         updateCheckboxGroupInput(session,'Itemtype', choices = company.itemtype)})
     
-    observe({
+    observe({ #Enable the dropdown list to filter (for items) on the selected Fast food franchise
         company.itemtype2 <- switch(input$company2, 
                                     `Arbys` = tblFastFood %>>% filter(Company == 'Arbys') %>>% (Item) %>>% unique %>>% sort %>>% as.character,
                                     `Baskin Robbins` = tblFastFood %>>% filter(Company == 'Baskin Robbins') %>>% (Item) %>>% unique %>>% sort %>>% as.character,
@@ -53,7 +48,8 @@ shinyServer(function(input, output, session) {
         updateSelectInput(session,'Itemtype6', choices = company.itemtype2)
     })
     
-    tblFastFoodFiltered <- reactive({
+    
+    tblFastFoodFiltered <- reactive({ #Reactive code to transform source table for easy ggplot
         tblFastFood %>>% 
             filter(Company == input$company, Item.Type %in% input$Itemtype) %>>% 
             gather(Nutritional.Category, Amount, Calories:Total.Fat) %>>% 
@@ -64,7 +60,7 @@ shinyServer(function(input, output, session) {
             left_join((group_by(., Item) %>>% summarise(Rank = sum(Amount))), by = 'Item')
     })
     
-    output$plot <- renderPlot({
+    output$plot <- renderPlot({ # Take transformed table and produce a horizontal pareto chart
         tblFastFoodFiltered() %>>%
             filter(!is.na(Amount)) %>>%
             ggplot(aes(reorder(Item, Amount), Amount)) + 
@@ -76,7 +72,7 @@ shinyServer(function(input, output, session) {
             scale_colour_hue("clarity")
     })
     
-    tblNutrition <- reactive({
+    tblNutrition <- reactive({ # Reactive code to transform source table for easy trellis charts
         tblFastFood %>>% 
             filter(Company == input$company, Item.Type %in% input$Itemtype) %>>% 
             gather(Nutritional.Category, Amount, Calories:Total.Fat) %>>% 
@@ -87,7 +83,7 @@ shinyServer(function(input, output, session) {
             left_join((group_by(., Item) %>>% summarise(Rank = sum(Amount))), by = 'Item')
     })
     
-    output$nutritionPlots <- renderPlot({
+    output$nutritionPlots <- renderPlot({ #Loop through different nutrition types and insert charts into a multiplot
         
         c('Carbs', 'Fiber', 'Protein', 'Sugars', 'Total.Fat', 'Cholesterol') -> vNutrition
         c(300, 25, 50, 40, 65, .3) -> vDailyValue
@@ -95,7 +91,7 @@ shinyServer(function(input, output, session) {
         list(NULL) -> listPlots
         
         for (i in 1:6){
-            tblNutrition() %>>% 
+            tblNutrition() %>>% #Loop through vNutrition and create multiple horizontal pareto charts
                 filter(Nutritional.Category == vNutrition[i]) %>>%
                 arrange(desc(Amount)) %>>%
                 top_n(10, Amount) %>>%
@@ -114,7 +110,7 @@ shinyServer(function(input, output, session) {
     
     output$table <- renderDataTable(tblFastFood, options = list(pageLength = 10))
     
-    tblCaloryIntake <- reactive({
+    tblCaloryIntake <- reactive({ #Create a food intake data frame for display and calculation
         data_frame(
             Item = c(input$Itemtype2, input$Itemtype3, input$Itemtype4, input$Itemtype5, input$Itemtype6),
             Calories = c(tblFastFood %>>% filter(Item == input$Itemtype2) %>>% (Calories),
@@ -127,20 +123,20 @@ shinyServer(function(input, output, session) {
     })
     
     
-    output$tableCalc <- renderTable({
+    output$tableCalc <- renderTable({ # Display the data frame showing user data
         tblCaloryIntake()
     })
     
-    output$textTotalCalories <- renderText({
+    output$textTotalCalories <- renderText({# Sum the calorie data from the data frame. Shows the total calorie intake based on user selection
         tblCaloryIntake() %>>% (Total_Calories) %>>% sum
     })
     
-    output$plotActivity <- renderPlot({
+    output$plotActivity <- renderPlot({ #Create another dataframe on different exercise types and calculate calorie burn rate
         tblCaloryIntake() %>>% (Total_Calories) %>>% sum -> vCalories
         data_frame(
             Activity = factor(1:11, label = c('Stand Still', 'Biking - 6mph', 'Office Work/Housekeeping', 'Walk - 3mph', 'Tennis - Singles', 'Biking - 12 mph',
                                               'Swim - Leisurely Pace', 'Swim 50 yd/min', 'Run - 6 mph', 'Cross-Country Skiing', 'Jumping rope - Moderate Pace')),
-            Time = c(
+            Time = c( # Calorie burn rate differs based on exercise type
                 ((vCalories/(input$numInput_Wgh * .532)*60))/1440, #Standing Still
                 ((vCalories/(input$numInput_Wgh * 1.6)*60))/1440, #Biking - 6mph
                 ((vCalories/(input$numInput_Wgh * 1.6)*60))/1440, #Office Work/Housekeeping
@@ -159,7 +155,7 @@ shinyServer(function(input, output, session) {
                    `D HH:MM:SS` = ifelse(Time < 1,format(`D HH:MM:SS`, '%H:%M:%S'), format(`D HH:MM:SS`, '%d %H:%M:%S'))) %>>%
             arrange(Activity) %>>%
             (~ tblExersion) %>>%
-            ggplot(aes(reorder(Activity, Time), Time)) +
+            ggplot(aes(reorder(Activity, Time), Time)) + # Show exercise time required to burn off the total calorie intake
             geom_bar(stat = 'identity', color = 'black', fill = 'red') +
             geom_text(aes(label = `D HH:MM:SS`, y = Time + max(tblExersion$Time) * 0.05), size = 3) +
             ylim(0, max(tblExersion$Time) * 1.4) +

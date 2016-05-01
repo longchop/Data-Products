@@ -1,12 +1,13 @@
 
 library(shiny);library(dplyr); library(pipeR); library(readr); library(tidyr); library(ggplot2); library(lubridate); library(shinythemes)
+source('ProcessingData.R')
+
 
 # Define UI for application
-shinyUI(fluidPage(
+shinyUI(fluidPage( # Create a tab layout. 4 tabs 1 intro, 2 Chart summary, 3 data table, and 4 calorie intake
     
-    theme = shinytheme("united"), # Set the theme
-    theme = shinytheme("united"),
-    tabsetPanel(
+    theme = shinytheme("united"), # Set the overall theme
+    tabsetPanel( #This tab provides a overall visual summary of nutrition intake
         tabPanel(
             'Intro',
             mainPanel(h1('Fast Food Nutritional Values Application'),
@@ -39,7 +40,7 @@ shinyUI(fluidPage(
                  )
         ),
         
-        tabPanel(
+        tabPanel( # This tab provides a detailed table for quick food lookup
             'Nutrition Table',
             titlePanel('Nutrition by Company'),
             h4('This nutrition table will enable you to quickly look up the nutritional values for the different food types in a table format.'),
@@ -48,7 +49,7 @@ shinyUI(fluidPage(
             mainPanel(dataTableOutput('table'))
         ),
         
-        tabPanel(
+        tabPanel( #This tab calculates calorie intake and required exercise to burn off the given calorie intake
             'Calorie Counter',
             titlePanel('Burning off the calories'),
             # Sidebar
